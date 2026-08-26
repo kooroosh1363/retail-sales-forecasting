@@ -72,12 +72,29 @@ def clean_transactions(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
 
 def build_daily_sales(clean: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    first_timestamp = clean["InvoiceDate"].min()
+    last_timestamp = clean["InvoiceDate"].max()
+    terminal_date = last_timestamp.normalize()
+
     daily = (
         clean.assign(date=clean["InvoiceDate"].dt.normalize())
         .groupby("date", as_index=True)["line_revenue"]
         .sum()
         .sort_index()
     )
+
+    # The source ends on 2011-12-09 at 12:50 rather than at an end-of-day
+    # boundary. Treat that terminal calendar day as potentially incomplete and
+    # exclude it from model selection/evaluation rather than silently scoring a
+    # full-day forecast against a partial-day target.
+    terminal_day_excluded = False
+    excluded_terminal_sales = 0.0
+    if last_timestamp.time() != pd.Timestamp(last_timestamp.date()).time():
+        if terminal_date in daily.index:
+            excluded_terminal_sales = float(daily.loc[terminal_date])
+            daily = daily.loc[daily.index < terminal_date].copy()
+            terminal_day_excluded = True
+
     full_index = pd.date_range(daily.index.min(), daily.index.max(), freq="D")
     missing_dates = full_index.difference(daily.index)
     out = daily.reindex(full_index, fill_value=0.0).rename("sales").to_frame()
@@ -94,6 +111,12 @@ def build_daily_sales(clean: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "observed_sales_days": int((out["sales"] > 0).sum()),
         "zero_sales_days": int((out["sales"] == 0).sum()),
         "calendar_gaps_filled": int(len(missing_dates)),
+        "calendar_gap_policy": "missing dates are modeled as zero observed positive sales; source does not distinguish closure from no sales",
+        "source_first_timestamp": first_timestamp.isoformat(),
+        "source_last_timestamp": last_timestamp.isoformat(),
+        "terminal_day_excluded_as_potentially_incomplete": terminal_day_excluded,
+        "excluded_terminal_date": terminal_date.date().isoformat() if terminal_day_excluded else None,
+        "excluded_terminal_positive_sales": excluded_terminal_sales if terminal_day_excluded else 0.0,
         "series_start": out["date"].min().date().isoformat(),
         "series_end": out["date"].max().date().isoformat(),
     }
