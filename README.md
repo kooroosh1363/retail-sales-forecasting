@@ -23,9 +23,11 @@ Portfolio-grade time-series forecasting project that converts historical retail 
 
 The project uses the UCI **Online Retail** dataset with 541,909 raw invoice-line rows covering December 2010 through December 2011.
 
+The validated transaction cleaning run removes 9,288 cancellation rows, 2,517 non-positive rows, and 5,226 exact duplicates, leaving 524,878 positive transaction rows.
+
 The source ends on **2011-12-09 at 12:50**. Because that terminal date is not observed through a full end-of-day boundary, the forecasting series excludes 2011-12-09 from model selection and evaluation rather than scoring a full-day forecast against a partial-day target. The final modeled calendar day is therefore **2011-12-08**.
 
-Missing dates inside the modeled window are filled with zero observed positive sales so lag offsets and forecast horizons remain true calendar-day distances. The public source does not reveal whether those dates indicate closure, no sales, or missing capture, so zero-filled dates are a modeling convention rather than proof of zero demand.
+The final daily series contains 373 calendar days. There are 304 observed positive-sales days and 69 internal calendar gaps filled with zero observed positive sales. The public source does not reveal whether those dates indicate closure, no sales, or missing capture, so zero-filled dates are a modeling convention rather than proof of zero demand.
 
 See `DATA_SOURCE.md`, `DATA_DICTIONARY.md`, and `METHOD_CARD.md` for provenance, feature definitions, validation rules, and limitations.
 
@@ -93,9 +95,29 @@ Rolling features:
 
 WAPE is preferred over day-level MAPE because zero-sales days can make percentage error undefined or unstable.
 
+## CI-validated results
+
+The final audited run selects **Random Forest**.
+
+Mean backtest results across the four 14-day folds:
+
+| Model | MAE | RMSE | WAPE |
+| --- | ---: | ---: | ---: |
+| Random Forest | 10,813.51 | 14,827.28 | **26.88%** |
+| Seasonal Naive | 13,570.16 | 17,452.23 | 33.69% |
+| Ridge | 14,550.09 | 19,268.93 | 36.19% |
+
+After model selection is locked, the untouched final 28-day holdout produces:
+
+- **MAE:** 10,068.13
+- **RMSE:** 16,203.51
+- **WAPE:** **19.89%**
+
+The holdout result is better than the average backtest result, but it is one 28-day historical window and should not be generalized into a guarantee of future forecasting accuracy.
+
 ## Uncertainty policy
 
-The pipeline creates a symmetric diagnostic band from the 90th percentile of absolute backtest errors for the selected method. It is **not** a calibrated 90% prediction interval and is documented only as an uncertainty approximation.
+The pipeline creates a symmetric diagnostic band from the 90th percentile of absolute backtest errors for the selected method. In the final audited run, that absolute-error quantile is about **19,510.59** revenue units. It is **not** a calibrated 90% prediction interval and is documented only as an uncertainty approximation.
 
 ## Generated artifacts
 
