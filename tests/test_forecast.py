@@ -18,6 +18,12 @@ def test_forecasting_pipeline_end_to_end():
     assert 0 <= metrics["test_metrics"]["wape"] < 2.0
     assert metrics["uncertainty"]["absolute_error_q90"] > 0
 
+    series_audit = metrics["series_audit"]
+    assert series_audit["terminal_day_excluded_as_potentially_incomplete"] is True
+    assert series_audit["excluded_terminal_date"] == "2011-12-09"
+    assert series_audit["series_end"] == "2011-12-08"
+    assert series_audit["source_last_timestamp"] == "2011-12-09T12:50:00"
+
     expected = [
         "daily_sales.csv",
         "backtest_metrics.csv",
@@ -33,6 +39,7 @@ def test_forecasting_pipeline_end_to_end():
 
     test = pd.read_csv(root / "artifacts" / "test_forecast.csv")
     assert len(test) == 28
+    assert test["date"].max() == "2011-12-08"
     assert (test["forecast"] >= 0).all()
     assert (test["lower_90_heuristic"] >= 0).all()
     assert (test["upper_90_heuristic"] >= test["forecast"]).all()
