@@ -6,14 +6,15 @@ Portfolio-grade time-series forecasting project that converts historical retail 
 
 - reproducible acquisition from the official UCI Machine Learning Repository
 - transaction cleaning and daily calendar aggregation
-- explicit zero-sales days for missing calendar dates
+- explicit calendar-gap handling
+- exclusion of the potentially incomplete terminal source day from evaluation
 - leakage-safe lag and rolling features
 - seasonal naive baseline
 - Ridge and Random Forest challengers
 - expanding-history walk-forward backtesting
 - recursive multi-step forecasting
 - model selection by backtest WAPE
-- untouched final 28-day holdout
+- untouched final 28-complete-day holdout
 - MAE, RMSE, WAPE and horizon-level error diagnostics
 - heuristic uncertainty bands with explicit claim boundaries
 - tests and GitHub Actions CI
@@ -21,6 +22,10 @@ Portfolio-grade time-series forecasting project that converts historical retail 
 ## Data
 
 The project uses the UCI **Online Retail** dataset with 541,909 raw invoice-line rows covering December 2010 through December 2011.
+
+The source ends on **2011-12-09 at 12:50**. Because that terminal date is not observed through a full end-of-day boundary, the forecasting series excludes 2011-12-09 from model selection and evaluation rather than scoring a full-day forecast against a partial-day target. The final modeled calendar day is therefore **2011-12-08**.
+
+Missing dates inside the modeled window are filled with zero observed positive sales so lag offsets and forecast horizons remain true calendar-day distances. The public source does not reveal whether those dates indicate closure, no sales, or missing capture, so zero-filled dates are a modeling convention rather than proof of zero demand.
 
 See `DATA_SOURCE.md`, `DATA_DICTIONARY.md`, and `METHOD_CARD.md` for provenance, feature definitions, validation rules, and limitations.
 
@@ -32,7 +37,8 @@ official UCI Online Retail ZIP
     -> remove cancellations / non-positive rows / exact duplicates
     -> line revenue
     -> aggregate daily sales
-    -> fill missing calendar days with zero sales
+    -> exclude potentially incomplete terminal source day
+    -> fill internal calendar gaps with zero observed positive sales
     -> lag + shifted rolling + calendar features
     -> expanding-history 4-fold backtest
     -> 14-day recursive horizon per fold
@@ -49,7 +55,7 @@ official UCI Online Retail ZIP
 
 Random train/test splitting is intentionally not used.
 
-The final 28 calendar days are excluded from model selection. Candidate methods are compared only on earlier walk-forward folds. Lag features use only prior observations, rolling statistics are shifted by one day, and multi-step forecasts are recursive: later horizons consume earlier predictions rather than future actual sales.
+The final 28 complete calendar days are excluded from model selection. Candidate methods are compared only on earlier walk-forward folds. Lag features use only prior observations, rolling statistics are shifted by one day, and multi-step forecasts are recursive: later horizons consume earlier predictions rather than future actual sales.
 
 ## Candidate methods
 
@@ -83,7 +89,7 @@ Rolling features:
 - recursive forecasting
 - primary selection metric: mean WAPE
 - secondary selection metric: mean MAE
-- final test: last 28 calendar days, never used for candidate selection
+- final test: last 28 complete calendar days, never used for candidate selection
 
 WAPE is preferred over day-level MAPE because zero-sales days can make percentage error undefined or unstable.
 
